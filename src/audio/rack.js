@@ -108,6 +108,18 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
     },
   };
 
+  // BREAK — sliced amen-style breakbeat (jungle/breakcore). One Player,
+  // 16 equal slices; each step triggers a slice (re-choppable via
+  // ch.break.slices). playbackRate locks the break to the transport BPM.
+  // Optional: only built when the sample is in the manifest.
+  let breakPlayer = null;
+  const breakNativeBpm = state.breakNativeBpm ?? 165;
+  if (buffers.has('break')) {
+    breakPlayer = new Tone.Player(buffers.get('break'));
+    breakPlayer.playbackRate = state.bpm / breakNativeBpm;
+    registerTrack('break', breakPlayer, ch.break?.fx);
+  }
+
   // ACID — 303-style mono synth + dedicated filter (always present)
   const acidFilter = new Tone.Filter({ type: 'lowpass', frequency: 800, rolloff: -24, Q: 8 });
   const acid = new Tone.MonoSynth({
@@ -134,6 +146,13 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
       if (activeOf('hat') && stepsOf('hat')[step]) {
         const openMap = ch.hat?.open ?? [];
         hat.trigger(time, !!openMap[step]);
+      }
+      if (breakPlayer && activeOf('break') && stepsOf('break')[step]) {
+        const sliceMap = ch.break?.slices ?? [];
+        const idx = Math.min(15, Math.max(0, sliceMap[step] ?? step));
+        const srcSliceDur = breakPlayer.buffer.duration / 16;
+        // consume one source slice; wall-clock time = srcDur / rate = one 16th at bpm
+        breakPlayer.start(time, idx * srcSliceDur, srcSliceDur / breakPlayer.playbackRate);
       }
       if (activeOf('acid') && stepsOf('acid')[step]) {
         const notes = notesOf('acid');

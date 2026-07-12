@@ -11,6 +11,16 @@
 /** Ordered by specificity — first match becomes primaryTag. */
 const RULES = [
   {
+    tag: 'breakcore',
+    trace: ['bpm>=190', 'break.active'],
+    test: (s) => s.bpm >= 190 && s.channels.break?.active,
+  },
+  {
+    tag: 'jungle',
+    trace: ['160<=bpm<190', 'break.active'],
+    test: (s) => s.bpm >= 160 && s.bpm < 190 && s.channels.break?.active,
+  },
+  {
     tag: 'hardcore-vinyl',
     trace: ['bpm>=190', 'clapDistortion>=0.7'],
     test: (s) => s.bpm >= 190 && s.fx.clapDistortion >= 0.7,

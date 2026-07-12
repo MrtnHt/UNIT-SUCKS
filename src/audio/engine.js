@@ -41,6 +41,10 @@ const SAMPLE_MANIFEST = {
   clap: 'samples/909-clap.wav',
   hatClosed: 'samples/909-hat-closed.wav',
   hatOpen: 'samples/909-hat-open.wav',
+  // Royalty-free RE-PLAYED amen-style break, 1 bar @ 165 BPM. NEVER the
+  // original Winstons recording (commercial tool — licensing). Provenance
+  // documented in README.
+  break: 'samples/amen-replay-165.wav',
 };
 
 export const buffers = new Tone.ToneAudioBuffers();

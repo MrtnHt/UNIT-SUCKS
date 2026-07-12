@@ -51,19 +51,23 @@ Non-negotiables:
 ## 2.2 Classification rules
 
 Deterministic and inspectable — no ML until there's data to train on
-(rule engine in `tasteProfile.js`, thresholds in one table):
+(rule engine in `tasteProfile.js`, thresholds in one table). Rules are ordered
+by specificity; the first matching rule fires:
 
-| Rule (all conditions AND) | Tag |
-|---|---|
-| BPM ≥ 190 **and** clapDistortion ≥ 0.7 | `hardcore-vinyl` |
-| 170 ≤ BPM < 190 **and** delayWet ≥ 0.4 | `acid-tekno` |
-| 170 ≤ BPM < 190 **and** acid channel active | `acid-tekno` |
-| BPM ≥ 190 **and** clapDistortion < 0.7 | `early-rave` |
-| 140 ≤ BPM < 170 **and** clapDistortion ≥ 0.5 | `industrial-tekno` |
-| 140 ≤ BPM < 170 | `tekno` |
-| BPM < 140 | `electro-acid` (catch-all floor) |
+| Rule (all conditions AND) | Tag | Specificity |
+|---|---|---|
+| break channel active **and** 160 ≤ BPM < 190 | `jungle` | highest |
+| break channel active **and** BPM ≥ 190 | `breakcore` | highest |
+| BPM ≥ 190 **and** clapDistortion ≥ 0.7 | `hardcore-vinyl` | high |
+| 170 ≤ BPM < 190 **and** delayWet ≥ 0.4 | `acid-tekno` | high |
+| 170 ≤ BPM < 190 **and** acid channel active | `acid-tekno` | high |
+| BPM ≥ 190 **and** clapDistortion < 0.7 | `early-rave` | high |
+| 140 ≤ BPM < 170 **and** clapDistortion ≥ 0.5 | `industrial-tekno` | medium |
+| 140 ≤ BPM < 170 | `tekno` | medium |
+| BPM < 140 | `electro-acid` | low (catch-all floor) |
 
-Multiple rules may fire; tags are ranked by specificity and the top 2 are sent.
+Multiple rules may fire; tags are ranked by specificity (jungle/breakcore are
+always highest) and the top 2 are sent.
 
 ## 2.3 Sample JSON payload (`POST /api/taste`)
 

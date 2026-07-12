@@ -65,12 +65,19 @@ Browsers hard-clip at 0 dBFS — it sounds like a broken speaker, not like satur
 The fix is a proper gain-staged bus, identical in spirit to a club PA chain:
 
 ```
-track voice → track Channel (gain/pan/mute/solo, -6 dB headroom)
-            → [track FX, e.g. clap distortion]
-            → masterBus (Tone.Gain, -3 dB)
+SEQUENCER CHAIN (live playback):
+track voice → [insert pedals: filter → distortion → delay → reverb]
+            → track Channel (gain/pan/mute/solo, -6 dB headroom)
+            → sequencerBus (Tone.Gain, -3 dB)
             → glueCompressor (Tone.Compressor: ratio 4, attack 3ms, release 0.25s, threshold -12 dB)
             → brickwall (Tone.Limiter, threshold -1 dBFS)
             → Tone.getDestination()
+
+PREVIEW CHAIN (record previews, bypasses glue comp to avoid pumping):
+previewPlayer → previewChannel (-3 dB) → brickwall limiter → Tone.getDestination()
+
+While a preview plays, duckSequencer() ramps the SEQUENCER bus down -12 dB
+(120 ms) and back up (400 ms) — the loop keeps running under the record.
 ```
 
 Key decisions:
@@ -78,17 +85,22 @@ Key decisions:
 - **Per-track `Tone.Channel`** gives mute/solo/pan for free and enforces headroom
   at the source. Default channel volume `-6 dB`: eight simultaneous hits sum to
   roughly `+3 dB` over one hit, which the bus still absorbs.
+- **Per-track FX insert order** is stable (filter → distortion → delay → reverb)
+  and declared in `sequencerState.channels.<id>.fx` with optional sub-objects.
 - **Glue compressor before the limiter.** The limiter alone works but pumps
   audibly when the kick and clap land together. The compressor takes the first
   6–8 dB musically; the limiter only catches transient peaks.
-- **`Tone.Limiter(-1)` as the last node.** `-1 dBFS` ceiling, not `0`: consumer
-  DACs overshoot on inter-sample peaks; the 1 dB margin is the difference between
-  "loud" and "crackles on phone speakers."
+- **Preview chain bypasses glue comp.** Record previews use a separate branch
+  to avoid dynamic compression artifacts; the `duckSequencer` ramps gain down
+  when the live sequencer plays so both can coexist on one output.
+- **`Tone.Limiter(-1)` as the only hard ceiling.** `-1 dBFS` ceiling, not `0`:
+  consumer DACs overshoot on inter-sample peaks; the 1 dB margin is the
+  difference between "loud" and "crackles on phone speakers."
 - **Nothing ever connects to `Tone.getDestination()` directly** except the
-  limiter. This is enforced in `engine.js` — all `connect()` calls route through
-  `registerTrack()`.
+  limiter. This is enforced in `rack.js` — all `connect()` calls are wired
+  by `buildRack()`, the single graph builder for both live and Tone.Offline export.
 
-Full implementation: [`src/audio/engine.js`](../src/audio/engine.js).
+Full implementation: [`src/audio/rack.js`](../src/audio/rack.js) and [`src/audio/engine.js`](../src/audio/engine.js).
 
 ---
 

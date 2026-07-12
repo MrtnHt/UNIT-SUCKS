@@ -94,7 +94,7 @@ export function buildPayload(state, sessionId) {
  * payload at most once per `idleMs` of silence and only when the profile
  * actually changed.
  */
-export function createTasteReporter({ endpoint = '/api/taste', idleMs = 3000, onProducts } = {}) {
+export function createTasteReporter({ endpoint = '/api/taste', idleMs = 3000, onProducts, onError } = {}) {
   const sessionId = crypto.randomUUID();
   let timer = null;
   let lastKey = '';
@@ -113,10 +113,15 @@ export function createTasteReporter({ endpoint = '/api/taste', idleMs = 3000, on
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          if (res.ok && onProducts) onProducts(await res.json());
-        } catch {
+          if (res.ok) {
+            if (onProducts) onProducts(await res.json());
+          } else if (onError) {
+            onError(new Error(`taste ${res.status}`)); // let the shelf degrade a tier
+          }
+        } catch (err) {
           // shop offline ≠ sequencer broken; fail silent, retry on next tweak
           lastKey = '';
+          if (onError) onError(err);
         }
       }, idleMs);
     },

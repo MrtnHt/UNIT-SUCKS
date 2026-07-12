@@ -1,0 +1,50 @@
+[
+  {
+    "id": "seed-ts004",
+    "name": "Tekno sucks 004 — GABBER ONTOLOGIE EP",
+    "price": "13.50",
+    "currency": "EUR",
+    "permalink": "https://shop.unitbreda.example/product/ts004",
+    "image": null,
+    "stockStatus": "instock",
+    "matchedTag": "hardcore-vinyl",
+    "previewUrl": null,
+    "previewDuration": null
+  },
+  {
+    "id": "seed-ts002",
+    "name": "Tekno sucks 002 — ACID MESH",
+    "price": "13.50",
+    "currency": "EUR",
+    "permalink": "https://shop.unitbreda.example/product/ts002",
+    "image": null,
+    "stockStatus": "instock",
+    "matchedTag": "acid-tekno",
+    "previewUrl": null,
+    "previewDuration": null
+  },
+  {
+    "id": "seed-unit-untitled06",
+    "name": "UNIT — UNTITLED 06",
+    "price": "15.00",
+    "currency": "EUR",
+    "permalink": "https://shop.unitbreda.example/product/untitled-06",
+    "image": null,
+    "stockStatus": "instock",
+    "matchedTag": "industrial-tekno",
+    "previewUrl": null,
+    "previewDuration": null
+  },
+  {
+    "id": "seed-unit-rave01",
+    "name": "UNIT — EARLY RAVE ARTEFACT 01",
+    "price": "14.00",
+    "currency": "EUR",
+    "permalink": "https://shop.unitbreda.example/product/rave-01",
+    "image": null,
+    "stockStatus": "instock",
+    "matchedTag": "early-rave",
+    "previewUrl": null,
+    "previewDuration": null
+  }
+]

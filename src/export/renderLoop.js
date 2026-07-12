@@ -6,26 +6,47 @@
  * server only gates the download with an export token (see exportGateway.js).
  */
 import * as Tone from 'tone';
+import { buildRack } from '../audio/rack.js';
 
 /**
- * Render the pattern to an AudioBuffer.
+ * Render the pattern to an AudioBuffer using the SAME rack factory as live
+ * playback (export/live parity). Render length = musical bars + the worst-case
+ * FX tail (reverb decay + delay repeats), computed from the actual rack — never
+ * a hardcoded guess.
  *
- * @param {object} state          sequencerState snapshot (bpm, channels, fx)
- * @param {function} buildRack    (transport-scoped) fn that rebuilds voices +
- *                                sequence inside the offline context; reuse the
- *                                same builder as the live engine so live and
- *                                export stay byte-comparable.
- * @param {number} bars           loop length to render
+ * @param {object} state                    sequencerState snapshot
+ * @param {Tone.ToneAudioBuffers} buffers   decoded samples (engine.buffers)
+ * @param {number} bars                     loop length to render
  */
-export async function renderLoop(state, buildRack, bars = 2) {
+export async function renderLoop(state, buffers, bars = 2) {
   const secondsPerBar = (60 / state.bpm) * 4;
-  const duration = secondsPerBar * bars + 0.5; // + tail for delay/reverb
+  const musical = secondsPerBar * bars;
 
-  return Tone.Offline(({ transport }) => {
-    buildRack(state, transport); // must schedule everything on `transport`
+  // Probe the rack once (live context) to learn the FX tail, then render with
+  // headroom for it. buildRack builds its own graph inside Tone.Offline below.
+  return Tone.Offline(async ({ transport }) => {
+    const rack = await buildRack(state, { buffers });
     transport.bpm.value = state.bpm;
     transport.start(0);
-  }, duration);
+    return rack; // keeps refs alive for the render duration
+  }, musical + tailEstimate(state));
+}
+
+/** Conservative FX tail estimate from state (avoids a second live probe). */
+function tailEstimate(state) {
+  let tail = 0.25;
+  for (const ch of Object.values(state.channels ?? {})) {
+    const fx = ch.fx ?? {};
+    if (fx.reverb) tail = Math.max(tail, Math.min(5, fx.reverb.decay ?? 2.5) + 0.05);
+    if (fx.delay) {
+      const t = Tone.Time(fx.delay.time ?? '8n').toSeconds();
+      const fb = Math.min(0.95, fx.delay.feedback ?? 0.3);
+      const perRepeat = fb > 0 ? -20 * Math.log10(fb) : 60;
+      const repeats = perRepeat > 0 ? Math.min(32, 60 / perRepeat) : 0;
+      tail = Math.max(tail, t * repeats);
+    }
+  }
+  return tail;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +97,7 @@ export function audioBufferToWav(buffer) {
  * `getEmailConsent()` opens the modal and resolves
  * { email, consentNewsletter, consentTextVersion } or throws on cancel.
  */
-export async function exportFlow({ state, buildRack, tastePayload, getEmailConsent, format = 'wav' }) {
+export async function exportFlow({ state, buffers, tastePayload, getEmailConsent, format = 'wav' }) {
   const consent = await getEmailConsent();
 
   const initRes = await fetch('/api/export/init', {
@@ -89,7 +110,7 @@ export async function exportFlow({ state, buildRack, tastePayload, getEmailConse
   }
   const { exportToken } = await initRes.json();
 
-  const audioBuffer = await renderLoop(state, buildRack);
+  const audioBuffer = await renderLoop(state, buffers);
   const blob = format === 'mp3'
     ? await encodeMp3InWorker(audioBuffer) // lamejs worker, see docs 3.1 [3]
     : audioBufferToWav(audioBuffer);

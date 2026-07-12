@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>UNIT STUDIO — MAKE YOUR BANGER</title>
+  <link rel="stylesheet" href="src/ui/tokens.css">
+  <link rel="stylesheet" href="src/ui/scene.css">
+  <!-- Dev shell: Tone.js via CDN importmap. Production MUST bundle (Vite)
+       and self-host — the store kiosk cannot depend on a CDN. -->
+  <script type="importmap">
+    { "imports": { "tone": "https://esm.sh/tone@14.9.17" } }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import { boot } from './src/ui/studioScene.js';
+    boot(document.getElementById('root'));
+  </script>
+</body>
+</html>

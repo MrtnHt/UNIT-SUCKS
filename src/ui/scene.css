@@ -1,0 +1,125 @@
+/* UNIT STUDIO — scene layout (spec §A). Tokens only, no color literals. */
+
+.app {
+  display: grid;
+  grid-template-rows: 56px 1fr 164px;
+  height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
+}
+
+/* A — transport strip */
+.transport {
+  display: flex; align-items: center; gap: 8px; padding: 0 8px;
+  background: var(--ink); border-bottom: 2px solid var(--cyan);
+}
+.transport .bpm { display: flex; align-items: center; gap: 2px; }
+.transport .bpm output {
+  font-size: var(--t-ui); min-width: 52px; text-align: center; color: var(--cyan);
+}
+.transport .share { border-color: var(--magenta); color: var(--magenta); margin-left: auto; }
+
+/* B — studio scene */
+.scene {
+  position: relative; overflow: hidden; min-height: 380px;
+  background: linear-gradient(var(--ink-2) 0 55%, var(--ink-3) 55% 100%);
+}
+.scene::before { /* wall/table seam + the single allowed studio-light radial */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border-top: 1px solid var(--line);
+  background: radial-gradient(circle at 50% 75%, rgba(255,255,255,.04), transparent 60%);
+}
+
+.gear {
+  position: absolute; transform: translate(-50%, -50%);
+  background: var(--ink-3); border: 2px solid var(--line);
+  box-shadow: var(--bevel); padding: 6px; cursor: pointer;
+}
+.gear .label { display: block; color: var(--paper-2); pointer-events: none; }
+.gear .led {
+  position: absolute; top: -14px; right: -14px; width: 44px; height: 44px;
+  background: none; border: none; box-shadow: none; min-width: 44px;
+}
+.gear .led::after {
+  content: ''; display: block; width: 8px; height: 8px; margin: auto;
+  background: var(--line); border: 1px solid var(--line);
+}
+.gear .led.on::after { background: var(--cyan); }
+.gear.fx-pedal { border-color: var(--magenta); }
+.gear.fx-pedal .label { color: var(--magenta); }
+
+/* gear positions per spec A.3 (+ BRK-LOOP) */
+.gear[data-track="kick"]  { left: 26%; top: 62%; min-width: 108px; min-height: 84px; }
+.gear[data-track="clap"]  { left: 68%; top: 58%; min-width: 100px; min-height: 80px; }
+.gear[data-track="hat"]   { left: 42%; top: 84%; min-width: 96px;  min-height: 72px; }
+.gear[data-track="acid"]  { left: 70%; top: 84%; min-width: 116px; min-height: 80px; }
+.gear[data-track="break"] { left: 12%; top: 84%; min-width: 96px;  min-height: 72px; }
+.gear[data-gear="dist"]   { left: 48%; top: 70%; min-width: 72px;  min-height: 88px; }
+
+.vu {
+  position: absolute; left: 88%; top: 30%; transform: translate(-50%, -50%);
+  width: 44px; height: 120px; background: var(--ink-3);
+  border: 2px solid var(--line); display: flex; align-items: flex-end;
+}
+.vu i { display: block; width: 100%; background: var(--cyan); transition: height 80ms steps(2); }
+
+/* brand set */
+.poster {
+  position: absolute; left: 12%; top: 18%; width: 96px; height: 128px;
+  transform: translate(-50%, -50%) skewX(-2deg);
+  background: var(--ink); border: 2px solid var(--paper);
+  color: var(--paper); text-align: center; padding-top: 28px; cursor: pointer;
+  font-size: var(--t-stamp); user-select: none; -webkit-user-select: none;
+}
+.poster small { display: block; font-size: var(--t-micro); color: var(--paper-2); margin-top: 12px; }
+.slipmat {
+  position: absolute; left: 70%; top: 96%; width: 120px; height: 120px;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: repeating-radial-gradient(circle, var(--ink) 0 4px, var(--paper) 4px 6px);
+}
+.sticker {
+  position: absolute; left: 20%; top: 56%; transform: rotate(4deg);
+  background: var(--paper); color: var(--ink); font-size: var(--t-micro);
+  padding: 2px 6px; pointer-events: none; text-transform: uppercase;
+}
+
+/* C — shelf zone (component in vinylShelf.js) */
+.shelf-zone { background: var(--ink); border-top: 1px solid var(--line); }
+
+/* power scrim */
+.scrim {
+  position: fixed; inset: 0; z-index: 100; background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--t-hero); text-transform: uppercase; letter-spacing: .08em;
+  cursor: pointer;
+}
+.scrim::before { /* CRT-off line */
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  border-top: 1px solid var(--paper-2); opacity: .4;
+}
+.scrim.off { animation: scrim-out 120ms steps(4) forwards; }
+@keyframes scrim-out { to { transform: scaleY(0); opacity: 0; visibility: hidden; } }
+
+/* overlays (grid/pedal/rack-back/share) */
+.overlay {
+  position: fixed; inset: 0; z-index: 95; background: var(--ink);
+  display: flex; flex-direction: column;
+  animation: snap-in 160ms steps(3);
+}
+@keyframes snap-in { 0% { filter: invert(1); } 50% { filter: none; opacity: .2; } 100% { opacity: 1; } }
+.overlay header {
+  display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+.overlay header .stamp { font-size: var(--t-stamp); }
+.overlay header .close { margin-left: auto; }
+
+/* ≥768: tablet/desktop */
+@media (min-width: 768px) {
+  .app {
+    grid-template-columns: 1fr 320px;
+    grid-template-rows: 56px 1fr;
+  }
+  .transport { grid-column: 1 / -1; }
+  .shelf-zone { border-top: none; border-left: 1px solid var(--line); }
+}

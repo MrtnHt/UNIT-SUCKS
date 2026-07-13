@@ -56,8 +56,13 @@ src/shop/
   seedRecords.json    evergreen product fallback
 src/presets/
   stylePresets.js     8 hand-programmed starter patterns (jungle/breakcore + 6 core)
-src/export/           client-side loop rendering WAV/MP3 (Module 3, owned by export agent)
-server/               email-gated download + newsletter gateway (Module 3, owned by export agent)
+src/export/
+  renderLoop.js       client-side loop rendering WAV/MP3 (Module 3)
+  mp3Worker.js        lamejs MP3 encode worker used by renderLoop.js
+  shareCard.js        canvas share-card compositor
+server/
+  exportGateway.js    email-gated download + newsletter gateway (Module 3)
+  tasteMiddleware.js  POST /api/taste + GET /api/products/random (Module 2)
 ```
 
 ## Samples

@@ -124,6 +124,21 @@ Middleware response:
 }
 ```
 
+## 2.3b Shelf fallback (`GET /api/products/random`)
+
+`src/shop/shelfStore.js` degrades through 4 tiers so the shelf is never empty:
+matched (above) → last-good cache → **random in-stock catalogue** → bundled
+seed data. The random tier hits the same middleware, no tag context needed:
+
+```
+GET /api/products/random?instock=1&per_page=4
+→ 200 { "products": [ /* same shape as §2.3 */ ], "cacheAge": 12 }
+```
+
+`instock=1` filters to `stock_status=instock`; `per_page` is clamped 1–20
+(default 4). Cached 60 s per query (shorter than the taste-match cache — this
+tier exists precisely to still feel fresh when the matched tier is down).
+
 ## 2.4 WooCommerce side (one-time setup)
 
 1. Create the tag taxonomy above; tag the catalogue (owner, ~2 h).

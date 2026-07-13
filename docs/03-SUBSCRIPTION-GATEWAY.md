@@ -18,7 +18,8 @@ render) and [`server/exportGateway.js`](../server/exportGateway.js) (gate + list
 
 [2] client POST /api/export/init
       { email, consentNewsletter: true, tasteProfile: {…Module 2 payload…} }
-      └─ server: validate e-mail syntax + MX
+      └─ server: validate e-mail syntax (MX-check: optional, ESP
+                 bounce-handling covers this instead)
       └─ server: upsert subscriber in ESP (Brevo/Mailchimp) status=PENDING,
                  attach taste tags (hardcore-vinyl, …) as segment attributes
       └─ server: trigger double opt-in confirmation mail (ESP native)

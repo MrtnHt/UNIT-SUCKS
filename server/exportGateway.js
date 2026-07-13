@@ -68,7 +68,7 @@ export async function handleInit(request) {
 
   const exportToken = await new SignJWT({ tags })
     .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(hashEmail(body.email)) // never store raw e-mail in the token
+    .setSubject(await hashEmail(body.email)) // never store raw e-mail in the token
     .setExpirationTime(`${TOKEN_TTL_S}s`)
     .setIssuedAt()
     .sign(secret());
@@ -97,11 +97,11 @@ function json(status, obj) {
   });
 }
 
-function hashEmail(email) {
-  // stable pseudonymous subject; swap for SHA-256 via WebCrypto in production
-  let h = 0;
-  for (const c of email.toLowerCase()) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0;
-  return `sub_${(h >>> 0).toString(16)}`;
+async function hashEmail(email) {
+  // stable pseudonymous subject; never store or log the raw e-mail
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.toLowerCase()));
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `sub_${hex.slice(0, 16)}`;
 }
 
 /** Cloudflare Worker entry. Rate limiting: bind a KV/DO or use CF rules (5/IP/h). */

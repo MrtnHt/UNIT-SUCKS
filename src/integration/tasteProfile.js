@@ -57,6 +57,9 @@ const RULES = [
   },
 ];
 
+/** Every tag slug the classifier can emit — the join key into WooCommerce tags. */
+export const KNOWN_TAGS = [...new Set(RULES.map((r) => r.tag))];
+
 /** Fraction of programmed steps across active channels, 0..1. */
 function patternDensity(channels) {
   let programmed = 0;

@@ -89,3 +89,23 @@ button:active { outline: 2px solid var(--cyan); outline-offset: 0; }
   .fx-flicker, .fx-spin { animation: none; }
   * { transition: none !important; }
 }
+
+/* D.5 interaction polish — appended, token-only */
+html { -webkit-tap-highlight-color: transparent; }
+::selection { background: var(--cyan); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+button { transition: border-color 90ms steps(2), color 90ms steps(2); }
+@media (hover: hover) { button:hover { border-color: var(--paper-2); } }
+
+/* hard-edged range sliders (grid params, pedal knobs) */
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 44px; background: transparent; cursor: ew-resize; }
+input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--line); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 28px; margin-top: -12px; background: var(--cyan); border: 1px solid var(--ink); box-shadow: var(--bevel); border-radius: 0; }
+input[type="range"]::-moz-range-track { height: 4px; background: var(--line); }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 28px; background: var(--cyan); border: 1px solid var(--ink); border-radius: 0; }
+
+/* thin dark scrollbars (shelf row) */
+* { scrollbar-width: thin; scrollbar-color: var(--line) var(--ink); }
+*::-webkit-scrollbar { height: 6px; width: 6px; }
+*::-webkit-scrollbar-track { background: var(--ink); }
+*::-webkit-scrollbar-thumb { background: var(--line); }

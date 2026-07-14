@@ -123,3 +123,12 @@
   .transport { grid-column: 1 / -1; }
   .shelf-zone { border-top: none; border-left: 1px solid var(--line); }
 }
+
+/* interaction polish — appended */
+@media (hover: hover) {
+  .gear:hover { border-color: var(--paper-2); }
+  .gear.fx-pedal:hover { border-color: var(--magenta); filter: brightness(1.25); }
+  .card:hover .sleeve, .card:hover > div:first-child { border-color: var(--paper-2); }
+}
+.gear:active { transform: translate(-50%, -50%) scale(.97); }
+.poster:active { transform: translate(-50%, -50%) skewX(-2deg) scale(.97); }

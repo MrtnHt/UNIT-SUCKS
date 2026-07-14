@@ -22,8 +22,8 @@ Implementation: [`src/integration/tasteProfile.js`](../src/integration/tasteProf
 ┌─────────────── MIDDLEWARE (Node/serverless, ~50 LOC) ─────────┐
 │  1. validate payload (schema below)                           │
 │  2. log profile → analytics store (append-only)               │
-│  3. GET {shop}/wp-json/wc/v3/products?tag={tagIds}&per_page=4 │
-│     auth: consumer key/secret — SERVER-SIDE ONLY              │
+│  3. GET {shop}/wp-json/wc/store/v1/products?category={ids} │
+│     public Store API — read-only, no credentials              │
 │  4. cache per tag-set, TTL 10 min                             │
 └────────┼──────────────────────────────────────────────────────┘
          ▼
@@ -35,15 +35,15 @@ Implementation: [`src/integration/tasteProfile.js`](../src/integration/tasteProf
 
 Non-negotiables:
 
-1. **WooCommerce keys never ship to the browser.** The REST consumer key/secret
-   grant read (or worse) access to the whole store. All Woo calls go through the
-   middleware. On WordPress hosting the middleware can be a 1-file WP plugin
-   exposing `/wp-json/unit/v1/taste`; otherwise a Cloudflare Worker / Vercel
-   function.
-2. **Tags are the join key.** Products in WooCommerce get curated tags
-   (`hardcore-vinyl`, `acid-tekno`, `industrial-tekno`, `mental-early-rave`, …).
-   The classifier maps audio state → those same slugs. Curation stays a human
-   (record-store-owner) job; the code only matches.
+1. **Reads go through the public Store API** (`/wp-json/wc/store/v1/*` on
+   unitbreda.nl — verified open, no consumer keys needed). The middleware stays
+   in place for caching, taste-logging and shape-mapping; if authenticated
+   endpoints are ever needed, keys still live server-side only.
+2. **Categories are the join key** (not tags — the live shop's tags are unused,
+   its categories are already curated: `free-tekno` 293, `hardcore` 160,
+   `techno` 106, `jungle_drum_and_bass` 86, `industrial` 14, …). The classifier
+   emits its own slugs; `CATEGORY_MAP` in `server/tasteMiddleware.js` translates
+   them to shop categories. No owner curation needed.
 3. **The taste log is an asset.** Every payload (anonymous, no PII) appended to a
    store gives the owner a demand heatmap: "62% of December sessions classified
    hardcore-vinyl" is direct purchasing intelligence for the label.
@@ -141,11 +141,12 @@ tier exists precisely to still feel fresh when the matched tier is down).
 
 ## 2.4 WooCommerce side (one-time setup)
 
-1. Create the tag taxonomy above; tag the catalogue (owner, ~2 h).
-2. Read-only REST key: WooCommerce → Settings → Advanced → REST API →
-   permissions **Read**.
-3. Middleware env: `WC_URL`, `WC_KEY`, `WC_SECRET`, `TASTE_LOG_URL`.
-4. Map tag slugs → tag IDs once at middleware boot (`GET /products/tags`), cache.
+1. Nothing — the category taxonomy already exists and is curated.
+2. No REST keys needed (public Store API, read-only).
+3. Middleware env: `WC_URL` (default unitbreda.nl), `TASTE_LOG_URL` (optional).
+4. Category slug → ID map resolved once at boot (`GET /products/categories`), cached.
+5. Bonus: product descriptions embed per-track MP3s — surfaced as `previewUrl`
+   for the shelf's preview player.
 
 ## Acceptance criteria
 

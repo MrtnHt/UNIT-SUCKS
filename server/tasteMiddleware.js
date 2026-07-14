@@ -1,110 +1,116 @@
 /**
  * UNIT SEQUENCER — taste + shelf middleware (Module 2, server side)
  *
- * Deployable as a Cloudflare Worker / Vercel function / 1-file Express app.
- * Two routes, both reading from the same WooCommerce store:
+ * Backed by the PUBLIC WooCommerce Store API of unitbreda.nl — read-only,
+ * no consumer keys needed (verified live: /wp-json/wc/store/v1/* is open).
  *
- *   POST /api/taste            (docs/02-WEBSHOP-INTEGRATION.md §2.1/§2.3/§2.4)
- *     1. validate payload (schema unit.taste-profile.v1, known tag slugs)
- *     2. log profile → analytics store (fire-and-forget, append-only)
- *     3. GET {WC_URL}/wp-json/wc/v3/products?tag={tagIds}&per_page=4
- *        auth: WooCommerce consumer key/secret — SERVER-SIDE ONLY
- *     4. cache per tag-set, TTL 10 min
+ *   POST /api/taste            classifier tags → shop CATEGORIES → products
+ *   GET /api/products/random   shelf tier 3 (src/shop/shelfStore.js)
  *
- *   GET /api/products/random   (shelf tier 3 — src/shop/shelfStore.js)
- *     in-stock catalogue sample, no taste-matching, short cache.
+ * The shop's curated taxonomy is categories, not tags (tags are unused there).
+ * CATEGORY_MAP translates classifier slugs → real unitbreda.nl category slugs.
+ * Product descriptions embed per-track MP3s → mapped to previewUrl.
  *
- * Env: WC_URL, WC_KEY, WC_SECRET, WC_CURRENCY, TASTE_LOG_URL
+ * Env: WC_URL (default https://unitbreda.nl), TASTE_LOG_URL (optional)
  */
 import { KNOWN_TAGS } from '../src/integration/tasteProfile.js';
 
-const TASTE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
-const RANDOM_CACHE_TTL_MS = 60 * 1000; // 1 min — keep it feeling "random"
+const TASTE_CACHE_TTL_MS = 10 * 60 * 1000;
+const RANDOM_CACHE_TTL_MS = 60 * 1000;
 const KNOWN_TAG_SET = new Set(KNOWN_TAGS);
+const WC_URL = () => process.env.WC_URL ?? 'https://unitbreda.nl';
+
+/** Classifier tag slug → unitbreda.nl product-category slug (live taxonomy). */
+const CATEGORY_MAP = {
+  'hardcore-vinyl': 'hardcore',
+  'early-rave': 'hardcore',
+  'acid-tekno': 'free-tekno',
+  'tekno': 'free-tekno',
+  'industrial-tekno': 'industrial',
+  'jungle': 'jungle_drum_and_bass',
+  'breakcore': 'jungle_drum_and_bass',
+  'electro-acid': 'electronic_house_edm_down-tempo_new-beat_big-beat',
+};
 
 // ---------------------------------------------------------------------------
 // Module-level caches — live for the isolate's lifetime.
 // ---------------------------------------------------------------------------
 
-/** Lazy, once-per-isolate: tag slug -> WooCommerce tag id. */
-let tagMapPromise = null;
+/** Lazy, once-per-isolate: category slug -> Store API category id. */
+let catMapPromise = null;
 
-/** Product-response cache, keyed by sorted comma-joined tag slugs. */
-const tasteCache = new Map(); // key -> { at: number, body: object }
-
-/** Random-products cache, keyed by the raw query string. */
-const randomCache = new Map(); // key -> { at: number, body: object }
+const tasteCache = new Map(); // sorted tag key -> { at, body }
+const randomCache = new Map(); // query key -> { at, body }
 
 // ---------------------------------------------------------------------------
-// WooCommerce adapter
+// Store API adapter (public, unauthenticated)
 // ---------------------------------------------------------------------------
 
-function wcAuthHeader() {
-  const raw = `${process.env.WC_KEY}:${process.env.WC_SECRET}`;
-  const token = typeof Buffer !== 'undefined'
-    ? Buffer.from(raw).toString('base64')
-    : btoa(raw);
-  return `Basic ${token}`;
+async function fetchCategoryMap() {
+  const res = await fetch(`${WC_URL()}/wp-json/wc/store/v1/products/categories?per_page=100`);
+  if (!res.ok) throw new Error(`Store API category lookup failed: ${res.status}`);
+  const cats = await res.json();
+  return new Map(cats.map((c) => [c.slug, c.id]));
 }
 
-async function fetchTagMap() {
-  const res = await fetch(`${process.env.WC_URL}/wp-json/wc/v3/products/tags?per_page=100`, {
-    headers: { Authorization: wcAuthHeader() },
-  });
-  if (!res.ok) throw new Error(`WooCommerce tag lookup failed: ${res.status}`);
-  const tags = await res.json();
-  return new Map(tags.map((t) => [t.slug, t.id]));
+function getCategoryMap() {
+  if (!catMapPromise) catMapPromise = fetchCategoryMap().catch((err) => { catMapPromise = null; throw err; });
+  return catMapPromise;
 }
 
-function getTagMap() {
-  if (!tagMapPromise) tagMapPromise = fetchTagMap().catch((err) => { tagMapPromise = null; throw err; });
-  return tagMapPromise;
-}
-
-/** Shared WooCommerce product -> shelf-record shape (docs/02 §2.3). */
+/** Store API product -> shelf-record shape (docs/02 §2.3). Prices are in minor units. */
 function mapProduct(p, matchedTag) {
-  const productTagSlugs = (p.tags ?? []).map((t) => t.slug);
+  const minor = p.prices?.currency_minor_unit ?? 2;
+  const price = p.prices?.price != null
+    ? (Number(p.prices.price) / 10 ** minor).toFixed(minor)
+    : null;
+  const previewUrl = /https?:\/\/[^"'\s]+?\.mp3/.exec(p.description ?? '')?.[0] ?? null;
   return {
     id: p.id,
     name: p.name,
-    price: p.price,
-    currency: process.env.WC_CURRENCY ?? 'EUR',
+    price,
+    currency: p.prices?.currency_code ?? 'EUR',
     permalink: p.permalink,
     image: p.images?.[0]?.src ?? null,
-    stockStatus: p.stock_status,
-    matchedTag: matchedTag ?? productTagSlugs.find((s) => KNOWN_TAG_SET.has(s)) ?? null,
+    stockStatus: p.is_in_stock ? 'instock' : 'outofstock',
+    matchedTag: matchedTag ?? null,
+    previewUrl,
   };
 }
 
 async function fetchProductsByTags(tagSlugs) {
-  const tagMap = await getTagMap();
-  const ids = tagSlugs.map((slug) => tagMap.get(slug)).filter(Boolean);
+  const catMap = await getCategoryMap();
+  // classifier tags → category slugs (deduped) → Store API ids
+  const catSlugs = [...new Set(tagSlugs.map((t) => CATEGORY_MAP[t]).filter(Boolean))];
+  const ids = catSlugs.map((slug) => catMap.get(slug)).filter(Boolean);
+  if (ids.length === 0) return [];
 
   const res = await fetch(
-    `${process.env.WC_URL}/wp-json/wc/v3/products?tag=${ids.join(',')}&per_page=4&status=publish`,
-    { headers: { Authorization: wcAuthHeader() } },
+    `${WC_URL()}/wp-json/wc/store/v1/products?category=${ids.join(',')}&per_page=4&stock_status=instock`,
   );
-  if (!res.ok) throw new Error(`WooCommerce product lookup failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Store API product lookup failed: ${res.status}`);
   const products = await res.json();
 
   return products.map((p) => {
-    const productTagSlugs = (p.tags ?? []).map((t) => t.slug);
-    const matchedTag = tagSlugs.find((slug) => productTagSlugs.includes(slug)) ?? tagSlugs[0];
+    const productCatSlugs = (p.categories ?? []).map((c) => c.slug);
+    const matchedTag = tagSlugs.find((t) => productCatSlugs.includes(CATEGORY_MAP[t])) ?? tagSlugs[0];
     return mapProduct(p, matchedTag);
   });
 }
 
 async function fetchRandomProducts({ instock, perPage }) {
-  const params = new URLSearchParams({ per_page: String(perPage), status: 'publish', orderby: 'rand' });
+  // Store API has no orderby=rand; over-fetch by popularity and sample.
+  const params = new URLSearchParams({ per_page: '20', orderby: 'popularity' });
   if (instock) params.set('stock_status', 'instock');
 
-  const res = await fetch(
-    `${process.env.WC_URL}/wp-json/wc/v3/products?${params}`,
-    { headers: { Authorization: wcAuthHeader() } },
-  );
-  if (!res.ok) throw new Error(`WooCommerce random lookup failed: ${res.status}`);
+  const res = await fetch(`${WC_URL()}/wp-json/wc/store/v1/products?${params}`);
+  if (!res.ok) throw new Error(`Store API random lookup failed: ${res.status}`);
   const products = await res.json();
-  return products.map((p) => mapProduct(p, null));
+
+  return products
+    .sort(() => Math.random() - 0.5)
+    .slice(0, perPage)
+    .map((p) => mapProduct(p, null));
 }
 
 // ---------------------------------------------------------------------------

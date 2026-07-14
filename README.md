@@ -65,14 +65,23 @@ server/
   tasteMiddleware.js  POST /api/taste + GET /api/products/random (Module 2)
 ```
 
-## Samples
+## Samples (optional — the studio synthesizes without them)
 
-The `samples/` directory must contain:
+Drum voices are **synthesized** by `src/audio/voices.js` (909/ESX-style: pitch-swept
+kick, filtered-noise clap, choked hi-hat), so the app makes sound with **zero
+assets**. Dropping a matching WAV into `samples/` overrides that voice with the
+sample. Live decay/tune/tone sliders drive the synth voices; sample voices ignore
+the params they can't honor.
+
+Optional overrides:
 
 - **`909-kick.wav`**, **`909-clap.wav`**, **`909-hat-closed.wav`**, **`909-hat-open.wav`** —
-  Roland TR-909 style drum samples, sourced from licensed/royalty-free packs only.
+  Roland TR-909 style drum samples, licensed/royalty-free packs only.
   **Roland™ trademark note:** UI labels must not use "TR-909" naming; prefer generic
-  ("Kick", "Clap", "Hi-Hat") or pack-neutral descriptors to avoid trademark friction.
+  ("Kick", "Clap", "Hi-Hat") or pack-neutral descriptors.
+
+- **`amen-replay-165.wav`** — required for the BREAK track (jungle/breakcore) — it has
+  **no synth fallback**. One-bar break loop at 165 BPM.
 
 - **`amen-replay-165.wav`** — One-bar break loop at 165 BPM. **CRITICAL: this must be a
   royalty-free RE-PLAYED amen-style break pattern, NOT the original Winstons "Amen, Brother"

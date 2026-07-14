@@ -132,3 +132,18 @@
 }
 .gear:active { transform: translate(-50%, -50%) scale(.97); }
 .poster:active { transform: translate(-50%, -50%) skewX(-2deg) scale(.97); }
+
+/* ESX-style groovebox — decorative wall unit, upscales the room */
+.groovebox {
+  position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%);
+  width: 168px; padding: 8px; background: var(--ink-3);
+  border: 2px solid var(--line); box-shadow: var(--bevel);
+}
+.groovebox .label { display: block; color: var(--cyan); margin-bottom: 6px; }
+.groovebox .pads { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.groovebox .pads i {
+  aspect-ratio: 1; background: var(--ink); border: 1px solid var(--line);
+}
+.groovebox .pads i:nth-child(3n) { background: var(--magenta); opacity: .55; }
+.groovebox .pads i:nth-child(4n+1) { background: var(--cyan); opacity: .4; }
+@media (max-width: 640px) { .groovebox { top: 22%; width: 140px; } }

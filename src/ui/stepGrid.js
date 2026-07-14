@@ -135,8 +135,14 @@ function applyParam(app, track, key, v) {
     }
     case 'cutoff': app.rack?.acidFilter.frequency.rampTo(200 + v * 4800, 0.03); break;
     case 'reso': app.rack?.acidFilter.Q.rampTo(1 + v * 14, 0.03); break;
-    case 'kickPitch': { const p = app.rack?.tracks.kick?.voice; if (p) p.playbackRate = 0.7 + v * 0.6; break; }
-    case 'hatDecay': case 'kickDecay': break; // sample decay: future envelope handle
+    case 'kickPitch': {
+      const p = app.rack?.tracks.kick?.voice;
+      if (p?.set) p.set('pitch', v);          // synth voice
+      else if (p) p.playbackRate = 0.7 + v * 0.6; // sample Player
+      break;
+    }
+    case 'kickDecay': app.rack?.tracks.kick?.voice.set?.('decay', v); break;
+    case 'hatDecay':  app.rack?.tracks.hat?.voice.set?.('decay', v); break;
     case 'openMix': { // probability of open hat on active steps
       ch.open = ch.steps.map((on, i) => on && (i % 8 === 7 || Math.random() < v * 0.3) ? 1 : 0);
       break;

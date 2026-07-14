@@ -23,6 +23,15 @@ import { createDistortion } from './fx/distortion.js';
 import { createDelay } from './fx/delay.js';
 import { createReverb } from './fx/reverb.js';
 import { createFilter } from './fx/filter.js';
+import { createKickVoice, createClapVoice, createHatVoice } from './voices.js';
+
+/** Real Tone node to feed the FX chain — Player is its own node; synth voices expose .outputNode. */
+const outNode = (voice) => voice.outputNode ?? voice;
+
+/** Sample if decoded, else synthesized. Both share the rack trigger interface. */
+function voiceFor(name, buffers, synthFactory) {
+  return buffers.has(name) ? new Tone.Player(buffers.get(name)) : synthFactory();
+}
 
 const FX_FACTORY = {
   distortion: createDistortion,
@@ -76,7 +85,7 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
     allPedals.push(...pedals);
     const inserts = pedals.flatMap((p) => p.inserts);
     const channel = new Tone.Channel({ volume: -6, pan: 0 }).connect(sequencerBus);
-    Tone.connectSeries(voice, ...inserts, channel);
+    Tone.connectSeries(outNode(voice), ...inserts, channel);
     tracks[id] = { voice, pedals, channel };
     return tracks[id];
   }
@@ -84,29 +93,38 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
   const ch = state.channels ?? {};
 
   // KICK — gabber signature: distortion drive lives here by default
-  const kick = new Tone.Player(buffers.get('kick'));
+  const kick = voiceFor('kick', buffers, () => createKickVoice(ch.kick?.voice ?? {}));
   registerTrack('kick', kick, ch.kick?.fx);
 
   // CLAP
-  const clap = new Tone.Player(buffers.get('clap'));
+  const clap = voiceFor('clap', buffers, () => createClapVoice(ch.clap?.voice ?? {}));
   registerTrack('clap', clap, ch.clap?.fx);
 
-  // HAT — closed + open with a choke group (closed trigger stops open, & vice-versa)
-  const hatClosed = new Tone.Player(buffers.get('hatClosed'));
-  const hatOpen = new Tone.Player(buffers.get('hatOpen'));
-  // both feed one hat channel/pedals
-  const hatMerge = new Tone.Gain(1);
-  hatClosed.connect(hatMerge);
-  hatOpen.connect(hatMerge);
-  registerTrack('hat', hatMerge, ch.hat?.fx);
-  const hat = {
-    trigger(time, open) {
-      // choke: stop whichever is ringing before the new hit
-      hatOpen.stop(time);
-      hatClosed.stop(time);
-      (open ? hatOpen : hatClosed).start(time);
-    },
-  };
+  // HAT — closed + open with a choke group. Sample pair if both decoded,
+  // else one synth hat voice exposing the same trigger/stop surface.
+  let hatVoice, hat;
+  if (buffers.has('hatClosed') && buffers.has('hatOpen')) {
+    const hatClosed = new Tone.Player(buffers.get('hatClosed'));
+    const hatOpen = new Tone.Player(buffers.get('hatOpen'));
+    const hatMerge = new Tone.Gain(1);
+    hatClosed.connect(hatMerge);
+    hatOpen.connect(hatMerge);
+    hatVoice = {
+      outputNode: hatMerge,
+      dispose: () => { hatClosed.dispose(); hatOpen.dispose(); hatMerge.dispose(); },
+    };
+    hat = {
+      trigger(time, open) {
+        hatOpen.stop(time);
+        hatClosed.stop(time);
+        (open ? hatOpen : hatClosed).start(time);
+      },
+    };
+  } else {
+    hatVoice = createHatVoice(ch.hat?.voice ?? {});
+    hat = hatVoice; // synth voice already has .trigger / .stop
+  }
+  registerTrack('hat', hatVoice, ch.hat?.fx);
 
   // BREAK — sliced amen-style breakbeat (jungle/breakcore). One Player,
   // 16 equal slices; each step triggers a slice (re-choppable via
@@ -192,7 +210,7 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
     sequence.dispose();
     allPedals.forEach((p) => p.dispose());
     Object.values(tracks).forEach((t) => { t.voice.dispose?.(); t.channel.dispose(); });
-    [hatClosed, hatOpen, hatMerge, acidFilter, sequencerBus, glueCompressor, limiter, meter].forEach((n) => n.dispose());
+    [acidFilter, sequencerBus, glueCompressor, limiter, meter].forEach((n) => n.dispose());
     previewChannel?.dispose();
   }
 

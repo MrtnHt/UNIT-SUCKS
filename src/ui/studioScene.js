@@ -5,7 +5,7 @@
  */
 import { preloadSamples, initLiveRack, startAudio, stopAudio, setBpm, buffers } from '../audio/engine.js';
 import { attachPreview } from '../audio/previewPlayer.js';
-import { loadPreset } from '../presets/stylePresets.js';
+import { loadPreset, PRESETS, PRESET_IDS } from '../presets/stylePresets.js';
 import { openGrid } from './stepGrid.js';
 import { openPedal } from './pedalView.js';
 import { openRackBack } from './rackBack.js';
@@ -24,6 +24,7 @@ export const app = {
   state: loadPreset('pilot-175'),
   rack: null,
   playing: false,
+  styleIdx: 0,
 };
 
 export async function boot(root) {
@@ -36,6 +37,7 @@ export async function boot(root) {
           <output id="bpm">${app.state.bpm}</output>
           <button id="bpm-up" aria-label="bpm up">+</button>
         </div>
+        <button id="style" aria-label="change style">${PRESETS[PRESET_IDS[app.styleIdx]].name}</button>
         <button id="dice" aria-label="randomize">DICE</button>
         <button id="share" class="share" aria-label="share">SHARE</button>
       </div>
@@ -48,6 +50,10 @@ export async function boot(root) {
             <button class="led on" data-mute="${g.track}" aria-label="mute ${g.track}"></button>
           </div>`).join('')}
         <div class="gear fx-pedal" data-gear="dist"><span class="label">DIST</span></div>
+        <div class="groovebox" aria-hidden="true">
+          <span class="label">ESX·GROOVE</span>
+          <div class="pads">${Array(8).fill('<i></i>').join('')}</div>
+        </div>
         <span class="sticker">Tekno sucks</span>
         <div class="vu" aria-hidden="true"><i id="vu-bar" style="height:0%"></i></div>
       </div>
@@ -89,6 +95,7 @@ export async function boot(root) {
 
   $('#dice').addEventListener('click', () => { randomize(); $('#bpm').textContent = app.state.bpm; });
   $('#share').addEventListener('click', () => openShareSheet(app));
+  $('#style').addEventListener('click', () => cycleStyle(root));
 
   // --- gear ------------------------------------------------------------------
   root.querySelectorAll('.gear[data-track]').forEach((el) => {
@@ -117,6 +124,20 @@ export async function boot(root) {
   });
 
   mountShelf($('#shelf'), app);
+}
+
+/** Next curated style: reload its pattern, rebuild the live rack, keep playing. */
+async function cycleStyle(root) {
+  app.styleIdx = (app.styleIdx + 1) % PRESET_IDS.length;
+  app.state = loadPreset(PRESET_IDS[app.styleIdx]);
+  root.querySelector('#style').textContent = PRESETS[PRESET_IDS[app.styleIdx]].name;
+  root.querySelector('#bpm').textContent = app.state.bpm;
+  if (app.rack) {
+    app.rack = await initLiveRack(app.state); // disposes the old graph
+    attachPreview(app.rack);
+    setBpm(app.state.bpm);
+  }
+  syncMuteLeds(root);
 }
 
 function toggleMute(track, led) {

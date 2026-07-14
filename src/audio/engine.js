@@ -36,33 +36,38 @@ export function getLatencyReport() {
 // 2. Sample preloading — decode once, share buffers, never fetch mid-pattern.
 // ---------------------------------------------------------------------------
 
+// Samples are an OPTIONAL enhancement layer. Any track without a decoded
+// sample is synthesized by rack.js (voices.js) — the studio always makes sound.
+// Drop matching WAVs into samples/ to override a synth voice.
+//   break has no synth fallback (a breakbeat can't be meaningfully synthesized);
+//   jungle/breakcore need samples/amen-replay-165.wav — a royalty-free
+//   RE-PLAYED amen-style break, 1 bar @ 165 BPM. NEVER the Winstons original
+//   (commercial tool — licensing). Provenance documented in README.
 const SAMPLE_MANIFEST = {
   kick: 'samples/909-kick.wav',
   clap: 'samples/909-clap.wav',
   hatClosed: 'samples/909-hat-closed.wav',
   hatOpen: 'samples/909-hat-open.wav',
-  // Royalty-free RE-PLAYED amen-style break, 1 bar @ 165 BPM. NEVER the
-  // original Winstons recording (commercial tool — licensing). Provenance
-  // documented in README.
   break: 'samples/amen-replay-165.wav',
 };
 
 export const buffers = new Tone.ToneAudioBuffers();
 
-/** Resolves when every sample is decoded. Gate the play button on this. */
+/**
+ * Attempts to decode every sample; NEVER rejects. A missing/failed file is
+ * logged and skipped — rack.js synthesizes that voice instead. Resolves with
+ * the buffers once all attempts settle.
+ */
 export function preloadSamples(manifest = SAMPLE_MANIFEST) {
   const entries = Object.entries(manifest);
-  if (entries.length === 0) return Promise.resolve(buffers); // empty-manifest fix
-  return new Promise((resolve, reject) => {
-    let remaining = entries.length;
-    for (const [name, url] of entries) {
-      buffers.add(
-        name, url,
-        () => { if (--remaining === 0) resolve(buffers); },
-        (err) => reject(new Error(`sample load failed: ${name} (${url}): ${err}`)),
-      );
-    }
-  });
+  if (entries.length === 0) return Promise.resolve(buffers);
+  return Promise.all(entries.map(([name, url]) => new Promise((res) => {
+    buffers.add(
+      name, url,
+      () => res(true),
+      () => { console.warn(`[engine] no sample for "${name}" — synthesizing`); res(false); },
+    );
+  }))).then(() => buffers);
 }
 
 // ---------------------------------------------------------------------------

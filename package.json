@@ -8,8 +8,9 @@
     "check": "node --check server/exportGateway.js && node --check server/tasteMiddleware.js && node --check src/audio/engine.js && node --check src/audio/rack.js && node --check src/audio/previewPlayer.js && node --check src/audio/fx/clapDistortion.js && node --check src/audio/fx/distortion.js && node --check src/audio/fx/delay.js && node --check src/audio/fx/reverb.js && node --check src/audio/fx/filter.js && node --check src/export/renderLoop.js && node --check src/export/mp3Worker.js && node --check src/export/shareCard.js && node --check src/integration/tasteProfile.js && node --check src/presets/stylePresets.js && node --check src/shop/shelfStore.js && node --check src/ui/pedalView.js && node --check src/ui/rackBack.js && node --check src/ui/stepGrid.js && node --check src/ui/studioScene.js && node --check src/ui/vinylShelf.js"
   },
   "dependencies": {
-    "tone": "^14.7.77",
+    "@vercel/speed-insights": "^2.0.0",
     "jose": "^5.9.6",
-    "lamejs": "^1.2.1"
+    "lamejs": "^1.2.1",
+    "tone": "^14.7.77"
   }
 }

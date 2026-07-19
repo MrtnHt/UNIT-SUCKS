@@ -4,7 +4,7 @@
  * unreachable. Previews duck the loop via previewPlayer.
  */
 import { getShelfRecords } from '../shop/shelfStore.js';
-import { createTasteReporter, buildPayload, classify } from '../integration/tasteProfile.js';
+import { createTasteReporter, buildPayload } from '../integration/tasteProfile.js';
 import { playPreview, stopPreview } from '../audio/previewPlayer.js';
 
 let currentPreviewId = null;
@@ -38,8 +38,7 @@ export function mountShelf(el, app) {
 }
 
 async function refresh(el, app) {
-  const profile = classify(app.state);
-  const { tier, records } = await getShelfRecords(profile);
+  const { tier, records } = await getShelfRecords(buildPayload(app.state, 'shelf-mount'));
   renderRecords(el, records, tier === 'MATCHED' || tier === 'LAST_GOOD'
     ? 'MATCHED TO YOUR LOOP' : 'FROM THE CRATES');
 }

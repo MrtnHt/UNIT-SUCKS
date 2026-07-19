@@ -48,11 +48,11 @@ function writeCache(records) {
   } catch { /* private mode / quota — non-fatal */ }
 }
 
-async function tierMatched(profile) {
+async function tierMatched(payload) {
   const res = await withTimeout(fetch('/api/taste', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ profile }),
+    body: JSON.stringify(payload), // full unit.taste-profile.v1 payload (buildPayload)
   }), TIER_TIMEOUT_MS);
   if (!res.ok) throw new Error(`taste ${res.status}`);
   const data = await res.json();
@@ -70,13 +70,13 @@ async function tierRandom() {
 }
 
 /**
- * @param {object} profile  taste profile (tags, primaryTag, ...)
+ * @param {object} payload  full taste payload (tasteProfile.buildPayload(state))
  * @returns {Promise<{tier:string, records:object[]}>}  records.length in [2,4]
  */
-export async function getShelfRecords(profile) {
+export async function getShelfRecords(payload) {
   // Tier 1
   try {
-    const records = await tierMatched(profile);
+    const records = await tierMatched(payload);
     if (isValid(records)) { writeCache(records); return { tier: 'MATCHED', records }; }
   } catch { /* fall through */ }
 

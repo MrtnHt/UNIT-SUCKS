@@ -23,14 +23,21 @@ import { createDistortion } from './fx/distortion.js';
 import { createDelay } from './fx/delay.js';
 import { createReverb } from './fx/reverb.js';
 import { createFilter } from './fx/filter.js';
-import { createKickVoice, createClapVoice, createHatVoice } from './voices.js';
+import { createKickVoice, createClapVoice, createHatVoice, createBreakVoice } from './voices.js';
+
+const isLoaded = (buffers, name) => buffers.has(name) && buffers.get(name).loaded;
 
 /** Real Tone node to feed the FX chain — Player is its own node; synth voices expose .outputNode. */
 const outNode = (voice) => voice.outputNode ?? voice;
 
-/** Sample if decoded, else synthesized. Both share the rack trigger interface. */
+/**
+ * Sample if it actually finished decoding, else synthesized. `buffers.has()`
+ * goes true the instant `.add()` is called — before the fetch/decode settles
+ * — so a 404 or bad file would otherwise construct a Player on a permanently
+ * empty buffer instead of falling back. `.loaded` is the real signal.
+ */
 function voiceFor(name, buffers, synthFactory) {
-  return buffers.has(name) ? new Tone.Player(buffers.get(name)) : synthFactory();
+  return isLoaded(buffers, name) ? new Tone.Player(buffers.get(name)) : synthFactory();
 }
 
 const FX_FACTORY = {
@@ -103,7 +110,7 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
   // HAT — closed + open with a choke group. Sample pair if both decoded,
   // else one synth hat voice exposing the same trigger/stop surface.
   let hatVoice, hat;
-  if (buffers.has('hatClosed') && buffers.has('hatOpen')) {
+  if (isLoaded(buffers, 'hatClosed') && isLoaded(buffers, 'hatOpen')) {
     const hatClosed = new Tone.Player(buffers.get('hatClosed'));
     const hatOpen = new Tone.Player(buffers.get('hatOpen'));
     const hatMerge = new Tone.Gain(1);
@@ -126,17 +133,29 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
   }
   registerTrack('hat', hatVoice, ch.hat?.fx);
 
-  // BREAK — sliced amen-style breakbeat (jungle/breakcore). One Player,
-  // 16 equal slices; each step triggers a slice (re-choppable via
-  // ch.break.slices). playbackRate locks the break to the transport BPM.
-  // Optional: only built when the sample is in the manifest.
-  let breakPlayer = null;
+  // BREAK — sliced amen-style breakbeat (jungle/breakcore). 16 slices per
+  // bar, each step triggers one (re-choppable via ch.break.slices). Sample
+  // if decoded (real audio, sliced by buffer offset); else a synthesized
+  // kick/snare/hat break voice using the SAME classic-amen hit map per
+  // slice index, so re-chopping still glitches the pattern predictably in
+  // both modes. Both expose `.triggerSlice(time, idx)`.
   const breakNativeBpm = state.breakNativeBpm ?? 165;
-  if (buffers.has('break')) {
-    breakPlayer = new Tone.Player(buffers.get('break'));
+  let breakVoice;
+  if (isLoaded(buffers, 'break')) {
+    const breakPlayer = new Tone.Player(buffers.get('break'));
     breakPlayer.playbackRate = state.bpm / breakNativeBpm;
-    registerTrack('break', breakPlayer, ch.break?.fx);
+    breakVoice = {
+      outputNode: breakPlayer,
+      triggerSlice(time, idx) {
+        const srcSliceDur = breakPlayer.buffer.duration / 16;
+        breakPlayer.start(time, idx * srcSliceDur, srcSliceDur / breakPlayer.playbackRate);
+      },
+      dispose: () => breakPlayer.dispose(),
+    };
+  } else {
+    breakVoice = createBreakVoice(ch.break?.voice ?? {});
   }
+  registerTrack('break', breakVoice, ch.break?.fx);
 
   // ACID — 303-style mono synth + dedicated filter (always present)
   const acidFilter = new Tone.Filter({ type: 'lowpass', frequency: 800, rolloff: -24, Q: 8 });
@@ -165,12 +184,10 @@ export async function buildRack(state, { buffers, destination, withPreview = fal
         const openMap = ch.hat?.open ?? [];
         hat.trigger(time, !!openMap[step]);
       }
-      if (breakPlayer && activeOf('break') && stepsOf('break')[step]) {
+      if (activeOf('break') && stepsOf('break')[step]) {
         const sliceMap = ch.break?.slices ?? [];
         const idx = Math.min(15, Math.max(0, sliceMap[step] ?? step));
-        const srcSliceDur = breakPlayer.buffer.duration / 16;
-        // consume one source slice; wall-clock time = srcDur / rate = one 16th at bpm
-        breakPlayer.start(time, idx * srcSliceDur, srcSliceDur / breakPlayer.playbackRate);
+        breakVoice.triggerSlice(time, idx);
       }
       if (activeOf('acid') && stepsOf('acid')[step]) {
         const notes = notesOf('acid');

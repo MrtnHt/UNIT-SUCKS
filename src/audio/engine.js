@@ -36,12 +36,12 @@ export function getLatencyReport() {
 // 2. Sample preloading — decode once, share buffers, never fetch mid-pattern.
 // ---------------------------------------------------------------------------
 
-// Samples are an OPTIONAL enhancement layer. Any track without a decoded
-// sample is synthesized by rack.js (voices.js) — the studio always makes sound.
-// Drop matching WAVs into samples/ to override a synth voice.
-//   break has no synth fallback (a breakbeat can't be meaningfully synthesized);
-//   jungle/breakcore need samples/amen-replay-165.wav — a royalty-free
-//   RE-PLAYED amen-style break, 1 bar @ 165 BPM. NEVER the Winstons original
+// Samples are an OPTIONAL enhancement layer. Every track — including BREAK —
+// is synthesized by rack.js (voices.js) when its sample is absent, so the
+// studio always makes sound with zero assets. Drop a matching WAV into
+// samples/ to override a synth voice with the real thing.
+//   For BREAK, samples/amen-replay-165.wav must be a royalty-free RE-PLAYED
+//   amen-style break, 1 bar @ 165 BPM — NEVER the Winstons original
 //   (commercial tool — licensing). Provenance documented in README.
 const SAMPLE_MANIFEST = {
   kick: 'samples/909-kick.wav',
@@ -58,16 +58,26 @@ export const buffers = new Tone.ToneAudioBuffers();
  * logged and skipped — rack.js synthesizes that voice instead. Resolves with
  * the buffers once all attempts settle.
  */
+const SAMPLE_LOAD_TIMEOUT_MS = 6000;
+
 export function preloadSamples(manifest = SAMPLE_MANIFEST) {
   const entries = Object.entries(manifest);
   if (entries.length === 0) return Promise.resolve(buffers);
-  return Promise.all(entries.map(([name, url]) => new Promise((res) => {
-    buffers.add(
-      name, url,
-      () => res(true),
-      () => { console.warn(`[engine] no sample for "${name}" — synthesizing`); res(false); },
-    );
-  }))).then(() => buffers);
+  return Promise.all(entries.map(([name, url]) => Promise.race([
+    new Promise((res) => {
+      buffers.add(
+        name, url,
+        () => res(true),
+        () => { console.warn(`[engine] no sample for "${name}" — synthesizing`); res(false); },
+      );
+    }),
+    // A stalled fetch (e.g. a rewrite serving HTML that decodeAudioData
+    // never settles on) must never block boot — cap the wait per file.
+    new Promise((res) => setTimeout(() => {
+      console.warn(`[engine] sample "${name}" timed out — synthesizing`);
+      res(false);
+    }, SAMPLE_LOAD_TIMEOUT_MS)),
+  ]))).then(() => buffers);
 }
 
 // ---------------------------------------------------------------------------

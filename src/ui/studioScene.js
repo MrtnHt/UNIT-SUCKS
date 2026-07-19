@@ -67,11 +67,16 @@ export async function boot(root) {
 
   // --- power scrim: first gesture starts everything -------------------------
   $('#scrim').addEventListener('pointerdown', async () => {
+    // Unlock the AudioContext FIRST, still inside the gesture. Browsers
+    // (esp. Safari) expire "user activation" once real async work (sample
+    // fetch/decode) runs before Tone.start() — resume() then hangs forever
+    // waiting for a gesture that already happened. bpm/transport-start also
+    // in startAudio() is harmless to run before the rack exists.
+    await startAudio(app.state.bpm);
     $('#scrim').querySelector('.label').textContent = 'LOADING TAPE…';
     await loading;
     app.rack = await initLiveRack(app.state);
     attachPreview(app.rack);
-    await startAudio(app.state.bpm);
     app.playing = true;
     $('#play').textContent = '■';
     $('#scrim').classList.add('off');

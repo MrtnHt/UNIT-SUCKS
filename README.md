@@ -67,11 +67,13 @@ server/
 
 ## Samples (optional — the studio synthesizes without them)
 
-Drum voices are **synthesized** by `src/audio/voices.js` (909/ESX-style: pitch-swept
-kick, filtered-noise clap, choked hi-hat), so the app makes sound with **zero
-assets**. Dropping a matching WAV into `samples/` overrides that voice with the
-sample. Live decay/tune/tone sliders drive the synth voices; sample voices ignore
-the params they can't honor.
+Every drum voice — kick, clap, hi-hat, and **break** — is **synthesized** by
+`src/audio/voices.js` (909/ESX-style: pitch-swept kick, filtered-noise clap,
+choked hi-hat, and a synthesized amen-style kick/snare/hat break pattern per
+slice), so the app makes sound with **zero assets**. Dropping a matching WAV
+into `samples/` overrides that voice with the sample. Live decay/tune/tone
+sliders drive the synth voices; sample voices ignore the params they can't
+honor.
 
 Optional overrides:
 
@@ -80,8 +82,9 @@ Optional overrides:
   **Roland™ trademark note:** UI labels must not use "TR-909" naming; prefer generic
   ("Kick", "Clap", "Hi-Hat") or pack-neutral descriptors.
 
-- **`amen-replay-165.wav`** — required for the BREAK track (jungle/breakcore) — it has
-  **no synth fallback**. One-bar break loop at 165 BPM.
+- **`amen-replay-165.wav`** — optional upgrade for the BREAK track (jungle/breakcore);
+  the synth fallback plays a chopped kick/snare/hat pattern instead of a real
+  break. One-bar break loop at 165 BPM if supplied.
 
 - **`amen-replay-165.wav`** — One-bar break loop at 165 BPM. **CRITICAL: this must be a
   royalty-free RE-PLAYED amen-style break pattern, NOT the original Winstons "Amen, Brother"

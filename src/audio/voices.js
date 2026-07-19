@@ -91,3 +91,49 @@ export function createHatVoice(cfg = {}) {
     dispose: () => { closed.dispose(); open.dispose(); hp.dispose(); out.dispose(); },
   };
 }
+
+/**
+ * Synthesized breakbeat: no sample to slice, so instead each of the 16 slice
+ * indices maps to a small kick/snare/hat combo — a classic amen-style hit
+ * layout (kick-hat / hat / snare / hat / kick / hat / snare-hat / hat / ...).
+ * `triggerSlice(time, idx)` mirrors the sample-Player's slice interface
+ * (see rack.js), so re-chopping (`ch.break.slices`) glitches the pattern the
+ * same way in both modes. Built from `createKickVoice` — one less voice to
+ * duplicate, and it keeps the same tune/decay controls.
+ */
+const AMEN_SLICE_PATTERN = [
+  ['kick', 'hat'], ['hat'],          ['snare'],        ['hat'],
+  ['kick'],        ['hat'],          ['snare', 'hat'], ['hat'],
+  ['kick', 'snare'], ['hat'],        ['snare'],        ['kick', 'hat'],
+  ['kick'],        ['hat'],          ['snare'],        ['hat'],
+];
+
+export function createBreakVoice(cfg = {}) {
+  const out = new Tone.Gain(1);
+  const kick = createKickVoice({ decay: cfg.kickDecay ?? 0.18, tune: cfg.tune ?? 45 });
+  kick.outputNode.connect(out);
+
+  const snareBand = new Tone.Filter({ type: 'bandpass', frequency: 1800, Q: 1 }).connect(out);
+  const snare = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: cfg.snareDecay ?? 0.09, sustain: 0, release: 0.02 },
+  }).connect(snareBand);
+
+  const hatHp = new Tone.Filter({ type: 'highpass', frequency: 8000 }).connect(out);
+  const hat = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 },
+  }).connect(hatHp);
+
+  return {
+    outputNode: out,
+    triggerSlice(time, idx) {
+      const hits = AMEN_SLICE_PATTERN[((idx % 16) + 16) % 16];
+      if (hits.includes('kick')) kick.start(time);
+      if (hits.includes('snare')) snare.triggerAttackRelease('16n', time);
+      if (hits.includes('hat')) hat.triggerAttackRelease('32n', time);
+    },
+    set: (key, v) => { if (key === 'tune' || key === 'decay') kick.set(key === 'tune' ? 'pitch' : 'decay', v); },
+    dispose: () => { kick.dispose(); snare.dispose(); snareBand.dispose(); hat.dispose(); hatHp.dispose(); out.dispose(); },
+  };
+}

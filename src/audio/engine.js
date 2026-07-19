@@ -58,7 +58,7 @@ export const buffers = new Tone.ToneAudioBuffers();
  * logged and skipped — rack.js synthesizes that voice instead. Resolves with
  * the buffers once all attempts settle.
  */
-const SAMPLE_LOAD_TIMEOUT_MS = 6000;
+const SAMPLE_LOAD_TIMEOUT_MS = 2500;
 
 export function preloadSamples(manifest = SAMPLE_MANIFEST) {
   const entries = Object.entries(manifest);
@@ -99,11 +99,21 @@ export function getLiveRack() { return liveRack; }
 export function getMasterMeter() { return liveRack?.meter ?? null; }
 
 // ---------------------------------------------------------------------------
-// 4. Transport — call startAudio() inside the user's first gesture.
+// 4. Transport
 // ---------------------------------------------------------------------------
 
-export async function startAudio(bpm = 175) {
+/**
+ * Resume the AudioContext. MUST run synchronously-ish inside the user's first
+ * gesture, BEFORE any awaited work (sample fetch), or browsers expire the
+ * activation and resume() hangs forever. Call this first, build the rack, then
+ * startAudio() to roll the transport once the sequence exists.
+ */
+export async function unlockAudio() {
   await Tone.start();
+}
+
+export async function startAudio(bpm = 175) {
+  await Tone.start(); // no-op once already running
   Tone.getTransport().bpm.value = bpm;
   Tone.getTransport().start('+0.05');
   console.info('[engine] latency report:', getLatencyReport());

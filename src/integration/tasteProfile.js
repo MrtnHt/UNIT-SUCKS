@@ -60,6 +60,26 @@ const RULES = [
 /** Every tag slug the classifier can emit — the join key into WooCommerce tags. */
 export const KNOWN_TAGS = [...new Set(RULES.map((r) => r.tag))];
 
+/**
+ * Flatten the per-track fx state into the {clapDistortion, delayWet, acidCutoff}
+ * summary the RULES read. Presets/live-state store fx PER TRACK
+ * (channels.<id>.fx.{distortion,delay,filter}); the classifier historically
+ * expected a top-level state.fx that only pedalView ever set — so without this
+ * derivation `state.fx` was undefined and every distortion/delay rule either
+ * crashed or silently never fired. Explicit state.fx (live pedal mirror) wins.
+ */
+export function deriveFx(state) {
+  const ch = state.channels ?? {};
+  const drive = (id) => ch[id]?.fx?.distortion?.drive ?? 0;
+  const delayWet = Math.max(0, ...Object.values(ch).map((c) => c?.fx?.delay?.wet ?? 0));
+  return {
+    clapDistortion: Math.max(drive('clap'), drive('kick')),
+    delayWet,
+    acidCutoff: ch.acid?.fx?.filter?.frequency ?? 800,
+    ...state.fx,
+  };
+}
+
 /** Fraction of programmed steps across active channels, 0..1. */
 function patternDensity(channels) {
   let programmed = 0;
@@ -73,7 +93,8 @@ function patternDensity(channels) {
 }
 
 export function classify(state) {
-  const hits = RULES.filter((r) => r.test(state));
+  const s = { ...state, fx: deriveFx(state) }; // guarantee s.fx for the RULES
+  const hits = RULES.filter((r) => r.test(s));
   const tags = [...new Set(hits.map((r) => r.tag))].slice(0, 2);
   return {
     tags,
@@ -95,7 +116,7 @@ export function buildPayload(state, sessionId) {
       channels: Object.fromEntries(
         Object.entries(state.channels).map(([k, v]) => [k, !!v.active]),
       ),
-      fx: { ...state.fx },
+      fx: deriveFx(state),
       patternDensity: Number(patternDensity(state.channels).toFixed(2)),
     },
     profile: classify(state),

@@ -3,7 +3,7 @@
  * Boot: power scrim → startAudio → PILOT-175 audible <150ms after tap.
  * Gear objects: 5 machines + DIST pedal + poster (long-press → flip-rack).
  */
-import { preloadSamples, initLiveRack, startAudio, stopAudio, setBpm, buffers } from '../audio/engine.js';
+import { preloadSamples, initLiveRack, unlockAudio, startAudio, stopAudio, setBpm, buffers } from '../audio/engine.js';
 import { attachPreview } from '../audio/previewPlayer.js';
 import { loadPreset, PRESETS, PRESET_IDS } from '../presets/stylePresets.js';
 import { openGrid } from './stepGrid.js';
@@ -66,22 +66,35 @@ export async function boot(root) {
   const loading = preloadSamples().catch((e) => { console.warn('[scene] samples:', e.message); return null; });
 
   // --- power scrim: first gesture starts everything -------------------------
+  let booted = false;
   $('#scrim').addEventListener('pointerdown', async () => {
-    // Unlock the AudioContext FIRST, still inside the gesture. Browsers
-    // (esp. Safari) expire "user activation" once real async work (sample
-    // fetch/decode) runs before Tone.start() — resume() then hangs forever
-    // waiting for a gesture that already happened. bpm/transport-start also
-    // in startAudio() is harmless to run before the rack exists.
-    await startAudio(app.state.bpm);
-    $('#scrim').querySelector('.label').textContent = 'LOADING TAPE…';
-    await loading;
-    app.rack = await initLiveRack(app.state);
-    attachPreview(app.rack);
-    app.playing = true;
-    $('#play').textContent = '■';
-    $('#scrim').classList.add('off');
-    syncMuteLeds(root);
-  }, { once: true });
+    if (booted) return;
+    booted = true;
+    try {
+      // 1. Unlock the AudioContext FIRST, inside the gesture, BEFORE any
+      //    awaited work — browsers (esp. Safari) expire "user activation" once
+      //    async work runs first, and resume() then hangs forever.
+      await unlockAudio();
+      $('#scrim').querySelector('.label').textContent = 'LOADING TAPE…';
+      // 2. Samples (fast: missing files error out immediately; a stalled
+      //    decode is capped by the per-file timeout in preloadSamples).
+      await loading;
+      // 3. Build the graph (synthesizes any voice without a sample), THEN roll
+      //    the transport — so the sequence exists before playback starts.
+      app.rack = await initLiveRack(app.state);
+      attachPreview(app.rack);
+      await startAudio(app.state.bpm);
+      app.playing = true;
+      $('#play').textContent = '■';
+      $('#scrim').classList.add('off');
+      syncMuteLeds(root);
+    } catch (err) {
+      // A silent freeze is the worst outcome — make failure visible & retryable.
+      console.error('[scene] boot failed:', err);
+      $('#scrim').querySelector('.label').textContent = `FOUT: ${err.message} — TIK OM OPNIEUW`;
+      booted = false;
+    }
+  });
 
   // --- transport -------------------------------------------------------------
   $('#play').addEventListener('click', () => {

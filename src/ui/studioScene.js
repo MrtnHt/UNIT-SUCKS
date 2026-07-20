@@ -20,8 +20,16 @@ const GEAR = [
   { track: 'break', label: 'BRK-LOOP' },
 ];
 
+let initialState;
+try {
+  initialState = loadPreset('pilot-175');
+} catch (err) {
+  console.error('[studioScene] loadPreset failed:', err);
+  initialState = { bpm: 175, channels: {} };
+}
+
 export const app = {
-  state: loadPreset('pilot-175'),
+  state: initialState,
   rack: null,
   playing: false,
   styleIdx: 0,

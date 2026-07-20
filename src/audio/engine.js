@@ -15,12 +15,19 @@ import { buildRack } from './rack.js';
 // 1. Context — created once, before any node, tuned for feel over safety.
 // ---------------------------------------------------------------------------
 
-const context = new Tone.Context({
-  latencyHint: 'interactive',
-  lookAhead: 0.05,
-  updateInterval: 0.02,
-});
-Tone.setContext(context);
+let context;
+try {
+  context = new Tone.Context({
+    latencyHint: 'interactive',
+    lookAhead: 0.05,
+    updateInterval: 0.02,
+  });
+  Tone.setContext(context);
+} catch (err) {
+  console.error('[engine] Tone.Context creation failed:', err.message);
+  // Create a fallback context — still may fail, but allows boot to continue
+  context = Tone.getContext();
+}
 
 export function getLatencyReport() {
   const raw = context.rawContext;

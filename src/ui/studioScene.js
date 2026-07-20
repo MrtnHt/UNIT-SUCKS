@@ -28,6 +28,7 @@ export const app = {
 };
 
 export async function boot(root) {
+  console.log('[boot] starting');
   root.innerHTML = `
     <div class="app">
       <div class="transport fx-flicker">

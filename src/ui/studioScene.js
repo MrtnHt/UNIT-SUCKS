@@ -76,7 +76,14 @@ export async function boot(root) {
 
   // --- power scrim: first gesture starts everything -------------------------
   let booted = false;
-  $('#scrim').addEventListener('pointerdown', async () => {
+  const scrim = $('#scrim');
+  if (!scrim) {
+    console.error('[studioScene] scrim element not found');
+    return;
+  }
+  console.log('[studioScene] attaching scrim listener');
+  scrim.addEventListener('pointerdown', async () => {
+    console.log('[scrim] click detected, booted=', booted);
     if (booted) return;
     booted = true;
     try {
@@ -100,10 +107,16 @@ export async function boot(root) {
     } catch (err) {
       // A silent freeze is the worst outcome — make failure visible & retryable.
       console.error('[scene] boot failed:', err);
-      $('#scrim').querySelector('.label').textContent = `FOUT: ${err.message} — TIK OM OPNIEUW`;
+      const label = $('#scrim')?.querySelector('.label');
+      if (label) {
+        label.textContent = `FOUT: ${err.message}`;
+        label.style.color = '#ff2bd6';
+        label.style.fontSize = '12px';
+      }
       booted = false;
     }
   });
+  console.log('[studioScene] boot complete, scrim ready');
 
   // --- transport -------------------------------------------------------------
   $('#play').addEventListener('click', () => {

@@ -96,9 +96,11 @@ export function classify(state) {
   const s = { ...state, fx: deriveFx(state) }; // guarantee s.fx for the RULES
   const hits = RULES.filter((r) => r.test(s));
   const tags = [...new Set(hits.map((r) => r.tag))].slice(0, 2);
+  // Fallback: electro-acid is the catchall for any valid state
+  const safeTags = tags.length > 0 ? tags : ['electro-acid'];
   return {
-    tags,
-    primaryTag: tags[0] ?? null,
+    tags: safeTags,
+    primaryTag: safeTags[0] ?? null,
     // rough confidence: how many independent signals agreed
     confidence: Math.min(1, 0.6 + 0.16 * hits.length),
     ruleTrace: hits.flatMap((r) => r.trace),

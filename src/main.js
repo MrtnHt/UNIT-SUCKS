@@ -1,4 +1,5 @@
 import { boot } from './ui/studioScene.js';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 
 const root = document.getElementById('root');
 if (!root) {
@@ -8,6 +9,8 @@ if (!root) {
 
 try {
   boot(root);
+  // Initialize Vercel Speed Insights
+  injectSpeedInsights();
 } catch (err) {
   console.error('[main] boot failed at startup:', err);
   root.innerHTML = `<div style="color:#ff2bd6;padding:20px;font-family:monospace;white-space:pre-wrap">BOOT ERROR:\n\n${err.message}\n\n${err.stack}</div>`;
